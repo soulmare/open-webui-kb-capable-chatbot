@@ -291,38 +291,34 @@ Store the key in the `oikb` configuration:
 ~/.venvs/oikb/bin/oikb config set token 'YOUR_API_KEY'
 ```
 
-### One-time synchronization
+### `scripts/sync_kb.py`
 
-Example:
+Wraps `oikb sync`/`oikb watch`, reading `OIKB_BIN`, `KB_PATH`, and `KB_ID` from a `.env` file in the repo root instead of hardcoding them (`.env` is gitignored — copy `.env.template` to get started):
 
 ```bash
-~/.venvs/oikb/bin/oikb sync \
-  /home/alex/Documents/work/AI-Chatbot/data/home-stuff-kb \
-  --kb-id ad0507b3-42a3-45b7-9c46-1a24c74c992b
+cp .env.template .env
+# edit .env if your oikb path, KB directory, or KB ID differ from the defaults
+```
+
+One-time synchronization:
+
+```bash
+python3 scripts/sync_kb.py
 ```
 
 Check changes before synchronizing:
 
 ```bash
-~/.venvs/oikb/bin/oikb sync \
-  /home/alex/Documents/work/AI-Chatbot/data/home-stuff-kb \
-  --kb-id ad0507b3-42a3-45b7-9c46-1a24c74c992b \
-  --dry-run
+python3 scripts/sync_kb.py --dry-run
 ```
 
 `--dry-run` makes no changes and only shows which files would be added, modified, or deleted.
 
-### Automatic synchronization
-
-For automatic updates when files change, use `watch`:
+Watch the directory and sync automatically on changes:
 
 ```bash
-~/.venvs/oikb/bin/oikb watch \
-  /home/alex/Documents/work/AI-Chatbot/data/home-stuff-kb \
-  --kb-id ad0507b3-42a3-45b7-9c46-1a24c74c992b
+python3 scripts/sync_kb.py --watch
 ```
-
-`watch` monitors the directory and automatically performs an incremental sync after changes.
 
 ---
 

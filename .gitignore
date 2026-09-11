@@ -5,6 +5,9 @@ data/
 *.local
 *.sh
 
+# Local environment config (see .env.template)
+.env
+
 # Open WebUI backups (contain the Gemini API key in plaintext)
 config-backup.json
 models-backup.json
