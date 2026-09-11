@@ -324,7 +324,29 @@ python3 scripts/sync_kb.py --watch
 
 ## RAG retrieval tuning
 
-Query rewriting for knowledge retrieval is disabled (`Retrieval Query Generation` OFF under Admin Panel → Settings → Interface → Task Model) — it improves retrieval accuracy for this KB. This is applied by the [config import](#6-import-config-backup) above.
+`Retrieval Query Generation` (Admin Panel → Settings → Interface → Task Model) is ON, with a custom `Query Generation Prompt Template` instead of the built-in default:
+
+```text
+### Task:
+Rewrite the user's latest message into a single, self-contained search query for a personal knowledge base, resolving any pronouns or references ("it", "they", "both", "that one") using the chat history so the query makes sense on its own, with no prior context.
+
+### Rules:
+- Always produce exactly one query. This is a lookup against a small personal knowledge base, not a decision about whether external search is worthwhile - never return an empty list.
+- Include every specific entity, name, or attribute from the chat history that the latest message refers to.
+- Do not add commentary or explanation.
+
+### Output:
+Strictly return JSON: { "queries": ["..."] }
+
+### Chat History:
+<chat_history>
+{{MESSAGES:END:6}}
+</chat_history>
+```
+
+`rag.top_k` (Admin Panel → Settings → Documents) is raised from 6 to 10 — even a correctly rewritten query left some relevant entries just outside the old top-6 cutoff, and headroom matters more as the KB grows.
+
+All three settings are applied by the [config import](#6-import-config-backup) above.
 
 ---
 
