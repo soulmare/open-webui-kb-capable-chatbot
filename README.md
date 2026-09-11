@@ -26,12 +26,7 @@ Gemma 3:4B
 
 ## 1. Docker
 
-Skip if Docker is already installed.
-
-```bash
-docker --version
-docker run --rm hello-world
-```
+Docker is required. Install it following the official docs: https://docs.docker.com/engine/install/
 
 ---
 
@@ -116,6 +111,8 @@ Expected:
 LISTEN ... *:11434 ... *:*
 ```
 
+**Warning:** this exposes the Ollama API on all network interfaces, not just to Docker. Anyone on the same network can reach port 11434 with no authentication — make sure it's not reachable outside a trusted LAN, or restrict it with a firewall.
+
 ---
 
 ## 5. Open WebUI
@@ -167,62 +164,7 @@ After connecting, Open WebUI should see the Ollama models.
 
 ---
 
-## 7. Open WebUI management
-
-Start:
-
-```bash
-docker start open-webui
-```
-
-Stop:
-
-```bash
-docker stop open-webui
-```
-
-Restart:
-
-```bash
-docker restart open-webui
-```
-
-Logs:
-
-```bash
-docker logs open-webui
-```
-
-`--restart no` means Open WebUI does not start automatically after a system reboot.
-
----
-
-## 8. Update Open WebUI
-
-```bash
-docker pull ghcr.io/open-webui/open-webui:main
-
-docker stop open-webui
-docker rm open-webui
-```
-
-Create the container again:
-
-```bash
-docker run -d \
-  -p 3000:8080 \
-  --add-host=host.docker.internal:host-gateway \
-  -v open-webui:/app/backend/data \
-  --name open-webui \
-  --restart no \
-  ghcr.io/open-webui/open-webui:main
-```
-
-The `open-webui` volume is preserved, so Open WebUI data is not lost.
-
----
-
-## 9. Verification
+## 7. Verification
 
 Ollama:
 
@@ -262,31 +204,60 @@ http://localhost:3000
 
 ---
 
-## 10. RAG / Knowledge
+## Maintenance
 
-Long-term knowledge can be managed using Markdown files through Open WebUI Knowledge/RAG:
+### Open WebUI management
 
-```text
-Git repository
-      │
-      ▼
-Markdown files
-      │
-      ▼
-Open WebUI Knowledge / RAG
-      │
-      ▼
-Relevant chunks
-      │
-      ▼
-Ollama → LLM
+Start:
+
+```bash
+docker start open-webui
 ```
 
-The Git repository is the **source of truth**, while the RAG index is a derived index.
+Stop:
 
-A context window of at least **8192 tokens** is recommended for RAG.
+```bash
+docker stop open-webui
+```
 
-### oikb
+Restart:
+
+```bash
+docker restart open-webui
+```
+
+Logs:
+
+```bash
+docker logs open-webui
+```
+
+### Update Open WebUI
+
+```bash
+docker pull ghcr.io/open-webui/open-webui:main
+
+docker stop open-webui
+docker rm open-webui
+```
+
+Create the container again:
+
+```bash
+docker run -d \
+  -p 3000:8080 \
+  --add-host=host.docker.internal:host-gateway \
+  -v open-webui:/app/backend/data \
+  --name open-webui \
+  --restart no \
+  ghcr.io/open-webui/open-webui:main
+```
+
+The `open-webui` volume is preserved, so Open WebUI data is not lost.
+
+---
+
+## Knowledge Base sync (oikb)
 
 `oikb` is a separate tool for synchronizing a local directory with an Open WebUI Knowledge Base. It performs incremental synchronization: new, modified, and deleted files are processed, while unchanged files are skipped.
 
@@ -301,12 +272,6 @@ Check:
 
 ```bash
 ~/.venvs/oikb/bin/oikb --version
-```
-
-Example:
-
-```text
-oikb, version 0.4.0
 ```
 
 Configure Open WebUI:
@@ -372,22 +337,16 @@ For automatic updates when files change, use `watch`:
 
 `watch` monitors the directory and automatically performs an incremental sync after changes.
 
-The resulting workflow is:
+---
+
+## RAG retrieval tuning
+
+Disable query rewriting for knowledge retrieval — it improves retrieval accuracy for this KB:
 
 ```text
-Git repository
-      │
-      ▼
-Markdown files
-      │
-      │ oikb sync / watch
-      ▼
-Open WebUI Knowledge Base
-      │
-      ▼
-RAG index
-      │
-      ▼
-Gemma 3:4B
+Admin Panel
+→ Settings
+→ Interface
+→ Task Model
+→ Retrieval Query Generation → OFF
 ```
-
