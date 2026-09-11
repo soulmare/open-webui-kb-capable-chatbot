@@ -143,24 +143,21 @@ http://localhost:3000
 
 ---
 
-## 6. Connect Ollama to Open WebUI
+## 6. Import Config Backup
 
-In Open WebUI:
-
-```text
-Settings
-→ Admin
-→ Connections
-→ Ollama
-```
-
-URL:
+`config-backup.json` (see [Backup and restore](#backup-and-restore)) holds this instance's exported settings, including the Ollama connection URL, API key creation being enabled, and the RAG retrieval-query tuning described further down this README. Importing it in one step wires up all of that instead of setting each one by hand:
 
 ```text
-http://host.docker.internal:11434
+Admin Panel
+→ Settings
+→ Database
+→ Import Config
+→ select config-backup.json
 ```
 
-After connecting, Open WebUI should see the Ollama models.
+After importing, Open WebUI should see the Ollama models.
+
+**Warning:** this file contains the Gemini API key in plaintext (`openai.api_keys` is part of the exported config). Treat it like a credential — don't commit it, don't share it. It's already excluded via `.gitignore`.
 
 ---
 
@@ -280,17 +277,7 @@ Configure Open WebUI:
 ~/.venvs/oikb/bin/oikb config set url http://localhost:3000
 ```
 
-In Open WebUI, first enable API key creation:
-
-```text
-Settings
-→ Admin
-→ Authentication
-→ API Keys
-→ Allow users to create API keys for programmatic access
-```
-
-Then create an API key:
+API key creation is already enabled via the [config import](#6-import-config-backup) above. Create an API key:
 
 ```text
 Settings
@@ -341,12 +328,44 @@ For automatic updates when files change, use `watch`:
 
 ## RAG retrieval tuning
 
-Disable query rewriting for knowledge retrieval — it improves retrieval accuracy for this KB:
+Query rewriting for knowledge retrieval is disabled (`Retrieval Query Generation` OFF under Admin Panel → Settings → Interface → Task Model) — it improves retrieval accuracy for this KB. This is applied by the [config import](#6-import-config-backup) above.
+
+---
+
+## Model capabilities for reliable KB & web search retrieval
+
+Per-model, under `Admin Panel → Models → (select model)`, two settings control whether a model actually searches your data instead of just guessing:
+
+- **Capabilities → File Context**: gates whether Knowledge/file retrieval runs at all for that model. Defaults to ON, but check it explicitly — it was found switched OFF here on `gemini-3.5-flash-lite` during setup, which silently disabled KB search with no visible error.
+- **Capabilities → Web Search**: independent of File Context — must be ON for that model to even offer the web search toggle in chat.
+- **Advanced Params → Function Calling → Legacy**: the setting both features actually depend on. It forces Knowledge search and web search (and also image generation / code interpreter) to run automatically before generation, instead of leaving it up to the model to decide whether to call a search tool. Left at the default (native/unset), the model can just answer directly — which, in testing here, it consistently did on personal questions even with a KB correctly attached, silently skipping the search.
+
+In short:
+
+| Goal | Required settings |
+|---|---|
+| KB search works | `File Context` ON + `Function Calling` → `Legacy`, on any model with a Knowledge collection attached |
+| Web search works | `Web Search` capability ON + `Function Calling` → `Legacy`, **and** the web search toggle turned on for that message in the chat UI (it's a per-message opt-in, unlike Knowledge which is always-on once attached) |
+
+`File Context` has no effect on web search, and `Web Search` capability has no effect on KB search — they're independent switches. `Function Calling` is the one setting shared by both.
+
+---
+
+## Backup and restore
+
+### General settings
+
+Export/import works via the UI:
 
 ```text
 Admin Panel
 → Settings
-→ Interface
-→ Task Model
-→ Retrieval Query Generation → OFF
+→ Database
+→ Export Config / Import Config
 ```
+
+This covers RAG defaults, task settings, connection URLs, and the Ollama/API-key/retrieval-tuning settings referenced above. It also contains the Gemini API key in plaintext — don't commit or share the exported file.
+
+### Per-model settings (Capabilities, Function Calling, Knowledge)
+
+There's no working export/import for these — Open WebUI's `/api/v1/models/export` only returns models with a `base_model_id` set, which excludes direct provider-model overrides like `models/gemini-3.5-flash-lite`. Back these up by re-applying the settings from [Model capabilities for reliable KB & web search retrieval](#model-capabilities-for-reliable-kb--web-search-retrieval) manually, per model, under `Admin Panel → Models`.

@@ -5,6 +5,10 @@ data/
 *.local
 *.sh
 
+# Open WebUI backups (contain the Gemini API key in plaintext)
+config-backup.json
+models-backup.json
+
 # Python virtual environments
 .venv/
 venv/
