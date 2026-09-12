@@ -1,6 +1,9 @@
 # Local data
 data/
 
+# Kept on disk, not published
+engines-tests.md
+
 # Local scripts
 *.local
 *.sh
