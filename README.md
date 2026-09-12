@@ -24,6 +24,21 @@ Ollama (Linux host)
 Gemma 3:4B
 ```
 
+Gemini is wired in twice on purpose — see [Gemini via LiteLLM](#gemini-via-litellm-native-tool-calling):
+
+```text
+Open WebUI (Docker)
+   │
+   ├── direct ──▶ generativelanguage.googleapis.com/v1beta/openai   (models/gemini-3.5-flash-lite, legacy function calling)
+   │
+   └── webui-litellm-net (internal Docker network, no published port)
+                  ▼
+              LiteLLM (Docker)
+                  │ gemini/gemini-3.5-flash-lite (native Gemini API)
+                  ▼
+              generativelanguage.googleapis.com
+```
+
 ## 1. Docker
 
 Docker is required. Install it following the official docs: https://docs.docker.com/engine/install/
@@ -117,16 +132,10 @@ LISTEN ... *:11434 ... *:*
 
 ## 5. Open WebUI
 
-Run in Docker:
+Run via Docker Compose (`docker-compose.yml` in the repo root — also brings up `litellm`, see [Gemini via LiteLLM](#gemini-via-litellm-native-tool-calling)):
 
 ```bash
-docker run -d \
-  -p 3000:8080 \
-  --add-host=host.docker.internal:host-gateway \
-  -v open-webui:/app/backend/data \
-  --name open-webui \
-  --restart no \
-  ghcr.io/open-webui/open-webui:main
+docker compose up -d
 ```
 
 Check:
@@ -205,52 +214,28 @@ http://localhost:3000
 
 ### Open WebUI management
 
-Start:
+Start/stop/restart (both services):
 
 ```bash
-docker start open-webui
-```
-
-Stop:
-
-```bash
-docker stop open-webui
-```
-
-Restart:
-
-```bash
-docker restart open-webui
+docker compose up -d
+docker compose stop
+docker compose restart
 ```
 
 Logs:
 
 ```bash
-docker logs open-webui
+docker compose logs -f open-webui
 ```
 
 ### Update Open WebUI
 
 ```bash
-docker pull ghcr.io/open-webui/open-webui:main
-
-docker stop open-webui
-docker rm open-webui
+docker compose pull open-webui
+docker compose up -d open-webui
 ```
 
-Create the container again:
-
-```bash
-docker run -d \
-  -p 3000:8080 \
-  --add-host=host.docker.internal:host-gateway \
-  -v open-webui:/app/backend/data \
-  --name open-webui \
-  --restart no \
-  ghcr.io/open-webui/open-webui:main
-```
-
-The `open-webui` volume is preserved, so Open WebUI data is not lost.
+The `open-webui` volume is external and untouched by this, so data is not lost.
 
 ---
 
@@ -366,6 +351,60 @@ In short:
 | Web search works | `Web Search` capability ON + `Function Calling` → `Legacy`, **and** the web search toggle turned on for that message in the chat UI (it's a per-message opt-in, unlike Knowledge which is always-on once attached) |
 
 `File Context` has no effect on web search, and `Web Search` capability has no effect on KB search — they're independent switches. `Function Calling` is the one setting shared by both.
+
+---
+
+## Gemini via LiteLLM (native tool calling)
+
+`models/gemini-3.5-flash-lite`, via Google's OpenAI-compatible endpoint, silently ignores tools offered with `Function Calling: Native` — no tool call, no error, just a plain "I don't have internet access." That's why that model is set to `Legacy` (see [Model capabilities](#model-capabilities-for-reliable-kb--web-search-retrieval)): Legacy forces the search instead of letting the model decide.
+
+Same prompt via Gemini's **native** API (`gemini/gemini-3.5-flash-lite` through LiteLLM, not the OpenAI-compat endpoint) returns a correct `tool_calls` response — so the compat layer is what's broken, not the model.
+
+Fix: run [LiteLLM](https://github.com/BerriAI/litellm) as a local proxy on Gemini's native API, added as a second, separate Open WebUI connection. `models/gemini-3.5-flash-lite` (direct, Legacy) stays untouched; `litellm.gemini-3.5-flash-lite` (native, agentic) is new — both selectable side by side.
+
+### Setup
+
+Managed by the same `docker-compose.yml` as Open WebUI (`docker compose up -d` brings up both). Relevant bits:
+
+* `litellm/config.yaml` — model mapping, tracked in git (no secrets in it).
+* `litellm/.env` — `GEMINI_API_KEY` (same key already used by the direct connection) and a generated `LITELLM_MASTER_KEY`. Gitignored, `chmod 600`, referenced via `env_file` in compose.
+* `webui-litellm-net` — plain bridge network (not `--internal`, that would also block LiteLLM's outbound calls to Google), shared by both services in compose. Not LAN-exposed simply because `litellm` publishes no port to the host.
+
+```yaml
+# litellm/config.yaml
+model_list:
+  - model_name: gemini-3.5-flash-lite
+    litellm_params:
+      model: gemini/gemini-3.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+
+litellm_settings:
+  drop_params: true
+```
+
+Open WebUI connection — `Admin Panel → Settings → Connections` (or the `/openai/config` API): base URL `http://litellm:4000/v1`, API key = `LITELLM_MASTER_KEY`, prefix ID `litellm` (model shows up as `litellm.gemini-3.5-flash-lite`). Model entry for it: `Function Calling: Native`, `Web Search` capability on.
+
+### Verified end-to-end
+
+"get the latest news from NASA" on `litellm.gemini-3.5-flash-lite`, Web Search toggle on: 4 `search_web` calls, 7 round trips through `litellm` logs, final answer grounded with 11 cited sources.
+
+**Gotcha:** the Web Search toggle is per-message — the model capability alone doesn't add `search_web` to the tool list. Without it, only always-on tools (`query_knowledge_files`, `search_notes`, ...) are offered, which the model correctly ignores for a news question.
+
+### Maintenance
+
+Logs:
+
+```bash
+docker compose logs -f litellm
+```
+
+Restart after editing `litellm/config.yaml` or `litellm/.env`:
+
+```bash
+docker compose up -d --force-recreate litellm
+```
+
+Independent of the direct connection — stopping `litellm` doesn't affect `models/gemini-3.5-flash-lite`.
 
 ---
 
