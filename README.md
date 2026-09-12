@@ -218,3 +218,7 @@ python3 scripts/sync_kb.py --watch
 ### General settings
 
 Open WebUI's `Admin Panel → Settings → Database → Export Config / Import Config` backs up connection URLs (including the litellm one) and task/RAG defaults. If exported, treat the file like a credential — it can contain API keys in plaintext — don't commit or share it.
+
+### Per-account System Prompt (not covered by the export above)
+
+`Settings → General → System Prompt` is stored per user account, not in the admin config above — it isn't included in Export Config, so it won't come back via Import Config either. After a fresh setup or a restore, re-enter it manually in that same UI location. The current text is kept in [kb-system-prompt.md](kb-system-prompt.md).
