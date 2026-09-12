@@ -92,8 +92,6 @@ Per-model, under `Admin Panel → Models → litellm.gemini-3.5-flash-lite`, two
 
 "get the latest news from NASA" on `litellm.gemini-3.5-flash-lite`, Web Search toggle on: 4 `search_web` calls, 7 round trips through `litellm` logs, final answer grounded with 11 cited sources.
 
-**Gotcha:** the Web Search toggle is per-message — the model capability alone doesn't add `search_web` to the tool list. Without it, only always-on tools (`query_knowledge_files`, `search_notes`, ...) are offered, which the model correctly ignores for a news question.
-
 ---
 
 ## Maintenance
@@ -220,7 +218,3 @@ python3 scripts/sync_kb.py --watch
 ### General settings
 
 Open WebUI's `Admin Panel → Settings → Database → Export Config / Import Config` backs up connection URLs (including the litellm one) and task/RAG defaults. If exported, treat the file like a credential — it can contain API keys in plaintext — don't commit or share it.
-
-### Per-model settings (Capabilities, Function Calling, Knowledge)
-
-There's no working export/import for per-model settings such as Capabilities and Function Calling. Back these up by re-applying the settings from [Model capabilities](#4-model-capabilities-for-reliable-kb--web-search-retrieval) manually, under `Admin Panel → Models`.
